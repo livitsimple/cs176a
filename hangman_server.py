@@ -57,19 +57,52 @@ def end_game(win, game_word, client_socket):
 
 def client_handler(client_socket, client_address):
     incorrect = ""
+
+    try:
+        start_len = struct.unpack("!B", recv_exact(client_socket, 1))[0]
+    except ConnectionError:
+        return
+    
+    if start_len != 0:
+        return
     
     with open("hangman_words.txt", "r") as f:
-        words = f.read().split("\n")
-        game_word = random.choice(words)
+        words = [line.strip() for line in f if line.strip()]
+        numWords = len(words)
+        i = random.randrange(0, numWords)
+        game_word = words[i]
     
     correct = ["_" for _ in game_word]
 
-    while True:
-        packet = create_game_packet("".join(correct), incorrect)
-        client_socket.sendall(packet)
+    packet = create_game_packet("".join(correct), incorrect)
+    client_socket.sendall(packet)
 
-        client_msg = recv_exact(client_socket, 2).decode()
-        guess = client_msg[1]
+    
+
+    while True:
+
+        try:
+            msg_len = struct.unpack("!B", recv_exact(client_socket, 1))[0]
+        except ConnectionError:
+            break
+
+        if msg_len == 0:
+            continue
+
+        try:
+            guess_bytes = recv_exact(client_socket, msg_len)
+        except ConnectionError:
+            break
+
+        guess = guess_bytes.decode()
+
+        if len(guess) != 1 or not guess.isalpha():
+            packet = create_game_packet("".join(correct), incorrect)
+            client_socket.sendall(packet)
+            continue
+
+        guess = guess.lower()
+
 
         if guess in game_word:
             appear_loc = [i for i, ch in enumerate(game_word) if ch == guess]
@@ -86,6 +119,9 @@ def client_handler(client_socket, client_address):
         elif "_" not in correct:
             end_game(True, game_word, client_socket)
             break
+
+        packet = create_game_packet("".join(correct), incorrect)
+        client_socket.sendall(packet)
     
     with lock:
         if client_socket in active_clients:
@@ -100,18 +136,18 @@ def tcp_server(port):
         port: port number to listen on
     """
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.bind((HOST, port))
     server.listen(2)
     
     while True:
         client_socket, client_address = server.accept()
 
-        client_socket.recv(1)
-
         with lock:
             if len(active_clients) >= CLIENT_MAX:
                 overload = "server-overloaded"
-                client_socket.send(overload.encode())
+                client_socket.sendall(create_cntrl_packet(overload))
+                client_socket.close()
                 continue
             active_clients.append(client_socket)
 

@@ -20,15 +20,21 @@ def game_pack_proc(client):
     word = msg[:word_len].decode()
     incorrect = msg[word_len:].decode()
 
-    print(word)
-    print("Incorrect Guesses: " + incorrect)
+    print(" ".join(word))
+
+    if incorrect:
+        print("Incorrect Guesses: " + " ".join(incorrect))
+    else:
+        print("Incorrect Guesses: ")
+    print()
+
 
     
 
 def cntrl_pack_proc(client, msg_len):
     gm_cntrl = recv_exact(client, msg_len).decode()
     print(gm_cntrl)
-    return
+    return gm_cntrl
 
 def tcp_client(ip, port):
     """
@@ -45,39 +51,55 @@ def tcp_client(ip, port):
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client.connect((ip, port))
     
-    confirmation = input("Ready to start game? (y/n):")
+    try:
+        confirmation = input("Ready to start game? (y/n): ")
+    except EOFError:
+        print()
+        client.close()
+        return
 
     if confirmation == "n":
         client.close()
+        return
     else:
         header_0 = struct.pack("!B", 0)
-        client.send(header_0)
+        client.sendall(header_0)
 
 
     while True:
         byte_1 = struct.unpack("!B", recv_exact(client, 1))[0]
 
         if byte_1 > 0:
-            cntrl_pack_proc(client, byte_1)
-            break
+            text = cntrl_pack_proc(client, byte_1)
+
+            if text == "server-overloaded":
+                break
+            if text == "Game Over!":
+                break
+
+            continue
 
         game_pack_proc(client)
 
         valid_input = False
 
         while not valid_input:
-            guess = input("Letter to guess:")
+            try:
+                guess = input("Letter to guess: ")
+            except EOFError:
+                print()
+                client.close()
+                return
+            except KeyboardInterrupt:
+                client.close()
+                sys.exit(0)
             if len(guess) != 1 or not guess.isalpha():
                 print("Error! Please guess one letter.")
                 continue
             valid_input = True
 
-        client.sendall(b"1" + guess.lower().encode())
+        client.sendall(struct.pack("!B", 1) + guess.lower().encode())
 
-    for _ in range(2):
-        byte_1 = struct.unpack("!B", recv_exact(client, 1))[0]
-        cntrl_pack_proc(client, byte_1)
-    
     client.close()
 
 tcp_client(sys.argv[1], int(sys.argv[2]))
