@@ -1,3 +1,6 @@
+''' CS 176A - Lab 3: Hangman Game
+Project Partner: Kyle Manternach'''
+
 import socket
 import struct
 import sys
