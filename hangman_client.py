@@ -1,5 +1,5 @@
 ''' CS 176A - Lab 3: Hangman Game
-Project Partner: Kyle Manternach'''
+Project Team: Olivia Chen, Kyle Manternach'''
 
 import socket
 import struct
