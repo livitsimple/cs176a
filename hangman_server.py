@@ -1,5 +1,5 @@
 ''' CS 176A - Lab 3: Hangman Game
-Project Partner: Kyle Manternach'''
+Project Partner: Olivia Chen, Kyle Manternach'''
 
 import socket
 import threading
@@ -159,3 +159,4 @@ def tcp_server(port):
         t.start()
 
 tcp_server(int(sys.argv[1]))
+
